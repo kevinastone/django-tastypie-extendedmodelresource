@@ -562,13 +562,18 @@ class ExtendedModelResource(ModelResource):
         # Remove the other parameters used for the nested resources, if they
         # are present.
         kwargs.pop('nested_name', None)
-        kwargs.pop('parent_resource', None)
-        kwargs.pop('parent_object', None)
+        parent_resource = kwargs.pop('parent_resource', None)
+        parent_object = kwargs.pop('parent_object', None)
 
         bundle.obj = self._meta.object_class()
 
         for key, value in kwargs.items():
             setattr(bundle.obj, key, value)
+
+        # Try to find the parent object and set it on the bundle
+        for field_name, field_obj in self.fields.items():
+            if hasattr(field_obj, 'is_related') and field_obj.is_related and type(field_obj.to_class()) == type(parent_resource):
+                setattr(bundle.obj, field_name, parent_object)
 
         bundle = self.full_hydrate(bundle)
 
