@@ -274,18 +274,19 @@ class ExtendedModelResource(ModelResource):
 
             # If I am not authorized for the parent
             if not self.is_authorized_over_parent(request, parent_object):
-                stringified_kwargs = ', '.join(["%s=%s" % (k, v)
-                                                for k, v in kwargs.items()])
-                raise self._meta.object_class.DoesNotExist("Couldn't find an "
-                        "instance of '%s' which matched '%s'." %
-                        (self._meta.object_class.__name__, stringified_kwargs))
+                raise ImmediateHttpResponse(response=http.HttpUnauthorized())
+                # stringified_kwargs = ', '.join(["%s=%s" % (k, v)
+                #                                 for k, v in kwargs.items()])
+                # raise self._meta.object_class.DoesNotExist("Couldn't find an "
+                #         "instance of '%s' which matched '%s'." %
+                #         (self._meta.object_class.__name__, stringified_kwargs))
 
             return parent_object
         except ObjectDoesNotExist:
-            return http.HttpNotFound()
+            raise ImmediateHttpResponse(response=http.HttpNotFound())
         except MultipleObjectsReturned:
-            return http.HttpMultipleChoices("More than one parent resource is "
-                                            "found at this URI.")
+            raise ImmediateHttpResponse(response=http.HttpMultipleChoices("More than one parent resource is "
+                                            "found at this URI."))
 
     def parent_cached_obj_get(self, request=None, **kwargs):
         """
@@ -561,7 +562,7 @@ class ExtendedModelResource(ModelResource):
         related_manager = kwargs.pop('related_manager', None)
         # Remove the other parameters used for the nested resources, if they
         # are present.
-        kwargs.pop('nested_name', None)
+        nested_name = kwargs.pop('nested_name', None)
         parent_resource = kwargs.pop('parent_resource', None)
         parent_object = kwargs.pop('parent_object', None)
 
@@ -576,6 +577,14 @@ class ExtendedModelResource(ModelResource):
                 setattr(bundle.obj, field_name, parent_object)
 
         bundle = self.full_hydrate(bundle)
+
+        # Add an authorization
+        if not self.is_authorized_over_parent(request, parent_object):
+            raise ImmediateHttpResponse(response=HttpUnauthorized())
+
+        bundle = self.apply_nested_authorization_limits(request,
+                            nested_name, parent_resource, parent_object,
+                            bundle)
 
         # Save FKs just in case.
         self.save_related(bundle)
