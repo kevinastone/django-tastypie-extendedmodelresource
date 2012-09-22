@@ -429,7 +429,7 @@ class ExtendedModelResource(ModelResource):
         Also a hook to customize per ``Resource``.
         """
         method_name = 'apply_limits_nested_%s' % nested_name
-        if hasattr(parent_resource._meta.authorization, method_name):
+        if parent_resource and hasattr(parent_resource._meta.authorization, method_name):
             method = getattr(parent_resource._meta.authorization, method_name)
             object_list = method(request, parent_object, object_list)
 
@@ -590,7 +590,9 @@ class ExtendedModelResource(ModelResource):
         self.save_related(bundle)
 
         if related_manager is not None:
-            related_manager.add(bundle.obj)
+            if hasattr(related_manager, 'add'):
+                # Protects against ManyToManyFields with `through` parameters and hence a join table
+                related_manager.add(bundle.obj)
 
         # Save the main object.
         bundle.obj.save()
